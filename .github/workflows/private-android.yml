@@ -1,10 +1,11 @@
 # Private build: signed Firestick (arm32) and arm64 APKs that check your panel for updates.
 # Run it from the Actions tab, or let private-sync-upstream.yml start it after a new Plezy release.
 #
-# Needs, under Settings > Secrets and variables > Actions:
-#   Variables: PANEL_URL (e.g. https://plezy.daemonhub.tech)
-#   Secrets:   PANEL_CI_TOKEN, ANDROID_KEYSTORE_BASE64, ANDROID_STORE_PASSWORD,
-#              ANDROID_KEY_PASSWORD, ANDROID_KEY_ALIAS
+# Needs these secrets under Settings > Secrets and variables > Actions:
+#   ANDROID_KEYSTORE_BASE64  your signing key (.jks), base64-encoded
+#   SIGNING_PASSWORD         the key's password
+#   PANEL_CI_TOKEN           same as CI_TOKEN in the panel's .env
+# Optional variable PANEL_URL overrides the panel address below.
 name: Private Android build
 
 on:
@@ -18,6 +19,9 @@ on:
 permissions:
   contents: write
 
+env:
+  PANEL_URL: ${{ vars.PANEL_URL || 'https://plezy.daemonhub.tech' }}
+
 concurrency:
   group: private-android
   cancel-in-progress: false
@@ -30,11 +34,13 @@ jobs:
 
       - name: Check settings
         env:
-          PANEL_URL: ${{ vars.PANEL_URL }}
           HAS_KEY: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
+          HAS_PW: ${{ secrets.SIGNING_PASSWORD != '' }}
+          HAS_CI: ${{ secrets.PANEL_CI_TOKEN != '' }}
         run: |
-          [ -n "$PANEL_URL" ] || { echo "::error::Set the PANEL_URL variable (Settings > Secrets and variables > Actions > Variables)"; exit 1; }
-          [ "$HAS_KEY" = "true" ] || { echo "::error::Signing key secrets are missing"; exit 1; }
+          [ "$HAS_KEY" = "true" ] || { echo "::error::Add the ANDROID_KEYSTORE_BASE64 secret (Settings > Secrets and variables > Actions)"; exit 1; }
+          [ "$HAS_PW" = "true" ] || { echo "::error::Add the SIGNING_PASSWORD secret (Settings > Secrets and variables > Actions)"; exit 1; }
+          [ "$HAS_CI" = "true" ] || { echo "::error::Add the PANEL_CI_TOKEN secret (Settings > Secrets and variables > Actions)"; exit 1; }
 
       - name: Read versions
         id: v
@@ -75,12 +81,15 @@ jobs:
         run: flutter analyze --no-fatal-infos --no-fatal-warnings lib/panel lib/screens/main_screen.dart
 
       - name: Configure signing
+        env:
+          SIGNING_PASSWORD: ${{ secrets.SIGNING_PASSWORD }}
+          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
         run: |
-          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 --decode > android/app/upload-keystore.jks
+          echo "$KEYSTORE_B64" | base64 --decode > android/app/upload-keystore.jks
           cat > android/key.properties << EOF
-          storePassword=${{ secrets.ANDROID_STORE_PASSWORD }}
-          keyPassword=${{ secrets.ANDROID_KEY_PASSWORD }}
-          keyAlias=${{ secrets.ANDROID_KEY_ALIAS }}
+          storePassword=$SIGNING_PASSWORD
+          keyPassword=$SIGNING_PASSWORD
+          keyAlias=plezy
           storeFile=upload-keystore.jks
           EOF
 
@@ -90,7 +99,7 @@ jobs:
           --target-platform android-arm,android-arm64
           --build-name=${{ steps.v.outputs.name }}
           --build-number=${{ steps.v.outputs.build }}
-          --dart-define=PANEL_URL=${{ vars.PANEL_URL }}
+          --dart-define=PANEL_URL=${{ env.PANEL_URL }}
           --dart-define=GIT_COMMIT=${{ github.sha }}
 
       - name: Remove signing key
@@ -139,7 +148,6 @@ jobs:
 
       - name: Send to panel
         env:
-          PANEL_URL: ${{ vars.PANEL_URL }}
           PANEL_CI_TOKEN: ${{ secrets.PANEL_CI_TOKEN }}
         run: |
           base="https://github.com/${{ github.repository }}/releases/download/${{ steps.v.outputs.tag }}"
