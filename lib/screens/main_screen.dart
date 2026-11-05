@@ -19,6 +19,7 @@ import '../i18n/strings.g.dart';
 import '../services/app_exit_service.dart';
 import '../services/tvos_system_navigation_service.dart';
 import '../services/update_service.dart';
+import '../panel/panel_prompts.dart';
 import '../utils/app_logger.dart';
 import '../widgets/auth_error_banner.dart';
 import '../widgets/app_icon.dart';
@@ -636,6 +637,7 @@ class _MainScreenState extends State<MainScreen>
 
       // Check for updates on startup
       unawaited(_checkForUpdatesOnStartup());
+      PanelPrompts.start(context); // private build: panel updates + messages
     });
   }
 

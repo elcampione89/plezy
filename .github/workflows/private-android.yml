@@ -1,0 +1,156 @@
+# Private build: signed Firestick (arm32) and arm64 APKs that check your panel for updates.
+# Run it from the Actions tab, or let private-sync-upstream.yml start it after a new Plezy release.
+#
+# Needs, under Settings > Secrets and variables > Actions:
+#   Variables: PANEL_URL (e.g. https://plezy.daemonhub.tech)
+#   Secrets:   PANEL_CI_TOKEN, ANDROID_KEYSTORE_BASE64, ANDROID_STORE_PASSWORD,
+#              ANDROID_KEY_PASSWORD, ANDROID_KEY_ALIAS
+name: Private Android build
+
+on:
+  workflow_dispatch:
+    inputs:
+      notes:
+        description: "Extra notes for the update pop-up (optional)"
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+
+concurrency:
+  group: private-android
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check settings
+        env:
+          PANEL_URL: ${{ vars.PANEL_URL }}
+          HAS_KEY: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
+        run: |
+          [ -n "$PANEL_URL" ] || { echo "::error::Set the PANEL_URL variable (Settings > Secrets and variables > Actions > Variables)"; exit 1; }
+          [ "$HAS_KEY" = "true" ] || { echo "::error::Signing key secrets are missing"; exit 1; }
+
+      - name: Read versions
+        id: v
+        run: |
+          flutter_version=$(sed -n 's/^  FLUTTER_VERSION: "\(.*\)"/\1/p' .github/workflows/build.yml | head -1)
+          line=$(sed -n 's/^version: *//p' pubspec.yaml)
+          name=${line%%+*}; base=${line##*+}
+          build=$(( base * 1000 + GITHUB_RUN_NUMBER % 1000 ))
+          echo "flutter=${flutter_version:-stable}" >> "$GITHUB_OUTPUT"
+          echo "name=$name" >> "$GITHUB_OUTPUT"
+          echo "build=$build" >> "$GITHUB_OUTPUT"
+          echo "tag=private-$name-$build" >> "$GITHUB_OUTPUT"
+          echo "Plezy $name, build $build, Flutter ${flutter_version}"
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: ${{ steps.v.outputs.flutter }}
+          cache: true
+
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.pub-cache
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: private-${{ runner.os }}-${{ hashFiles('pubspec.lock', '**/*.gradle*', '**/gradle-wrapper.properties') }}
+
+      - name: Install dependencies
+        run: flutter pub get --enforce-lockfile --no-example
+
+      - name: Check the panel code
+        run: flutter analyze --no-fatal-infos --no-fatal-warnings lib/panel lib/screens/main_screen.dart
+
+      - name: Configure signing
+        run: |
+          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 --decode > android/app/upload-keystore.jks
+          cat > android/key.properties << EOF
+          storePassword=${{ secrets.ANDROID_STORE_PASSWORD }}
+          keyPassword=${{ secrets.ANDROID_KEY_PASSWORD }}
+          keyAlias=${{ secrets.ANDROID_KEY_ALIAS }}
+          storeFile=upload-keystore.jks
+          EOF
+
+      - name: Build APKs
+        run: >
+          flutter build apk --release --split-per-abi
+          --target-platform android-arm,android-arm64
+          --build-name=${{ steps.v.outputs.name }}
+          --build-number=${{ steps.v.outputs.build }}
+          --dart-define=PANEL_URL=${{ vars.PANEL_URL }}
+          --dart-define=GIT_COMMIT=${{ github.sha }}
+
+      - name: Remove signing key
+        if: always()
+        run: rm -f android/app/upload-keystore.jks android/key.properties
+
+      - name: Collect APKs
+        id: apks
+        run: |
+          mkdir -p out
+          aapt2=$(ls -d "$ANDROID_HOME"/build-tools/*/ | sort -V | tail -1)aapt2
+          for abi in armeabi-v7a arm64-v8a; do
+            src=build/app/outputs/flutter-apk/app-$abi-release.apk
+            dst=out/plezy-${{ steps.v.outputs.name }}-$abi.apk
+            cp "$src" "$dst"
+            # Flutter adds an offset per device type, so read the real code from the APK.
+            code=$("$aapt2" dump badging "$dst" | sed -n "s/.*versionCode='\([0-9]*\)'.*/\1/p" | head -1)
+            echo "${abi//-/_}_code=$code" >> "$GITHUB_OUTPUT"
+            echo "$abi: version code $code, $(du -h "$dst" | cut -f1)"
+          done
+
+      - name: Write update notes
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXTRA: ${{ inputs.notes }}
+        run: |
+          tag=${{ steps.v.outputs.name }}
+          {
+            [ -n "$EXTRA" ] && printf '%s\n\n' "$EXTRA"
+            # The official release notes for this version, tidied for a TV pop-up.
+            gh api "repos/edde746/plezy/releases/tags/$tag" -q .body 2>/dev/null \
+              | grep -v -i '^\*\*full changelog' \
+              | sed -e 's/^#\+ *//' -e 's/^- /• /' -e 's/\*\*//g' \
+              | head -n 80 || true
+          } > notes.txt
+          [ -s notes.txt ] || echo "Latest Plezy improvements and fixes." > notes.txt
+          cat notes.txt
+
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ steps.v.outputs.tag }}" out/*.apk \
+            --title "Private build ${{ steps.v.outputs.name }} (${{ steps.v.outputs.build }})" \
+            --notes-file notes.txt --target "${{ github.sha }}" --latest=false
+
+      - name: Send to panel
+        env:
+          PANEL_URL: ${{ vars.PANEL_URL }}
+          PANEL_CI_TOKEN: ${{ secrets.PANEL_CI_TOKEN }}
+        run: |
+          base="https://github.com/${{ github.repository }}/releases/download/${{ steps.v.outputs.tag }}"
+          for abi in armeabi-v7a arm64-v8a; do
+            file=plezy-${{ steps.v.outputs.name }}-$abi.apk
+            [ "$abi" = armeabi-v7a ] && code=${{ steps.apks.outputs.armeabi_v7a_code }} || code=${{ steps.apks.outputs.arm64_v8a_code }}
+            body=$(jq -n --arg url "$base/$file" --arg vn "${{ steps.v.outputs.name }}" --argjson vc "$code" \
+              --arg abi "$abi" --arg sha "$(sha256sum "out/$file" | cut -d' ' -f1)" --rawfile notes notes.txt \
+              '{url:$url, version_name:$vn, version_code:$vc, abi:$abi, sha256:$sha, notes:$notes}')
+            curl -fsS -X POST "${PANEL_URL%/}/api/ci/release" \
+              -H "Authorization: Bearer $PANEL_CI_TOKEN" -H "Content-Type: application/json" -d "$body"
+            echo
+          done
+          echo "::notice::Sent to the panel. Publish it there (or turn on auto-publish) to send the update pop-up."

@@ -1,0 +1,20 @@
+# Plezy panel. Put this file and .env in /opt/vader-apps/plezy-panel on DeathStar, then:
+#   docker compose pull && docker compose up -d
+# Point your reverse proxy at port 3020 (e.g. plezy.daemonhub.tech -> 127.0.0.1:3020).
+services:
+  plezy-panel:
+    image: ghcr.io/elcampione89/plezy-panel:latest
+    container_name: plezy-panel
+    restart: unless-stopped
+    env_file: .env
+    ports:
+      - "127.0.0.1:3020:8080"
+    volumes:
+      - plezy-panel-data:/data
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+
+volumes:
+  plezy-panel-data:

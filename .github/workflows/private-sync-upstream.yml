@@ -1,0 +1,60 @@
+# Keeps your fork on the newest official Plezy release, then starts a private build.
+# Runs every morning; you can also run it by hand from the Actions tab.
+#
+# Needs secret SYNC_TOKEN: a GitHub token with "Contents" and "Workflows" write access to
+# this repo (GitHub won't let the built-in token push changes to workflow files).
+name: Private sync with Plezy
+
+on:
+  schedule:
+    - cron: "17 5 * * *"
+  workflow_dispatch:
+    inputs:
+      force_build:
+        description: "Build even if already up to date"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.SYNC_TOKEN || github.token }}
+
+      - name: Merge the latest official release
+        id: sync
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git config user.name "plezy-sync"
+          git config user.email "plezy-sync@users.noreply.github.com"
+          git remote add upstream https://github.com/edde746/plezy.git
+          tag=$(gh api repos/edde746/plezy/releases/latest -q .tag_name)
+          git fetch --no-tags upstream "refs/tags/$tag:refs/tags/upstream-$tag"
+          if git merge-base --is-ancestor "upstream-$tag" HEAD; then
+            echo "Already on Plezy $tag."
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "Merging Plezy $tag…"
+          if ! git merge --no-edit -m "Sync with Plezy $tag" "upstream-$tag"; then
+            git diff --name-only --diff-filter=U
+            echo "::error::Plezy $tag clashes with the private changes in the files above. Merge it by hand (or ask Claude)."
+            exit 1
+          fi
+          git push origin HEAD:${{ github.ref_name }}
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+      - name: Start private build
+        if: steps.sync.outputs.changed == 'true' || inputs.force_build
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run private-android.yml --ref "${{ github.ref_name }}"

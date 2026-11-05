@@ -1,0 +1,394 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>Plezy Panel</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0d0f12; --panel:#15181d; --panel-2:#1b1f26; --line:#262b33; --text:#e9ecf1; --muted:#8b93a1;
+  --accent:#e5a00d; --accent-ink:#1a1200; --ok:#3ecf8e; --warn:#f5b84a; --bad:#ff6b6b; --info:#6ba8ff;
+  --radius:14px; --mono:"JetBrains Mono",ui-monospace,monospace;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--text);font-family:Manrope,system-ui,sans-serif;font-size:15px;-webkit-font-smoothing:antialiased}
+a{color:var(--accent)}
+button,input,select,textarea{font:inherit;color:inherit}
+.wrap{max-width:980px;margin:0 auto;padding:0 16px 80px}
+header{position:sticky;top:0;z-index:5;background:color-mix(in srgb,var(--bg) 88%,transparent);backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+.bar{max-width:980px;margin:0 auto;padding:14px 16px;display:flex;align-items:center;gap:12px}
+.logo{display:flex;align-items:center;gap:10px;font-weight:800;letter-spacing:-.02em;font-size:18px}
+.logo i{width:28px;height:28px;border-radius:8px;background:var(--accent);display:grid;place-items:center;color:var(--accent-ink);font-style:normal;font-size:15px}
+.spacer{flex:1}
+nav{display:flex;gap:4px;overflow-x:auto;padding:0 16px 10px;max-width:980px;margin:0 auto;scrollbar-width:none}
+nav button{background:none;border:0;padding:8px 14px;border-radius:999px;color:var(--muted);font-weight:600;cursor:pointer;white-space:nowrap}
+nav button.on{background:var(--panel-2);color:var(--text)}
+h2{font-size:22px;letter-spacing:-.02em;margin:26px 0 14px;display:flex;align-items:center;gap:10px}
+h3{font-size:15px;margin:0 0 8px}
+.grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:16px}
+.stat b{display:block;font-size:30px;font-weight:800;letter-spacing:-.03em}
+.stat span{color:var(--muted);font-size:13px}
+.muted{color:var(--muted)}
+.small{font-size:13px}
+.mono{font-family:var(--mono);font-size:12.5px}
+.list{display:flex;flex-direction:column;gap:10px}
+.item{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:14px 16px;display:flex;gap:14px;align-items:flex-start}
+.item .body{flex:1;min-width:0}
+.item .title{font-weight:700;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.item .actions{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.pill{font-size:11.5px;font-weight:700;padding:2px 8px;border-radius:999px;background:var(--panel-2);color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+.pill.published,.pill.ok{background:color-mix(in srgb,var(--ok) 18%,transparent);color:var(--ok)}
+.pill.draft{background:color-mix(in srgb,var(--warn) 18%,transparent);color:var(--warn)}
+.pill.failed,.pill.critical{background:color-mix(in srgb,var(--bad) 18%,transparent);color:var(--bad)}
+.pill.importing,.pill.info{background:color-mix(in srgb,var(--info) 18%,transparent);color:var(--info)}
+.pill.warning{background:color-mix(in srgb,var(--warn) 18%,transparent);color:var(--warn)}
+.btn{background:var(--panel-2);border:1px solid var(--line);padding:8px 14px;border-radius:10px;font-weight:600;cursor:pointer}
+.btn:hover{border-color:#3a414c}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.danger{color:var(--bad)}
+.btn.sm{padding:5px 10px;font-size:13px}
+.btn:disabled{opacity:.5;cursor:default}
+form .row{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));margin-bottom:12px}
+label{display:flex;flex-direction:column;gap:6px;font-size:13px;color:var(--muted);font-weight:600}
+input,select,textarea{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px 12px;outline:none;width:100%}
+input:focus,select:focus,textarea:focus{border-color:var(--accent)}
+textarea{min-height:90px;resize:vertical}
+.check{flex-direction:row;align-items:center;gap:8px;color:var(--text)}
+.check input{width:auto}
+.notes{white-space:pre-wrap;color:var(--muted);font-size:13.5px;margin-top:6px;max-height:4.5em;overflow:hidden}
+.bars{display:flex;flex-direction:column;gap:8px}
+.bars div{display:grid;grid-template-columns:110px 1fr 36px;gap:10px;align-items:center;font-size:13px}
+.bars .track{height:8px;background:var(--panel-2);border-radius:99px;overflow:hidden}
+.bars .fill{height:100%;background:var(--accent);border-radius:99px}
+.empty{padding:28px;text-align:center;color:var(--muted);border:1px dashed var(--line);border-radius:var(--radius)}
+.login{min-height:100vh;display:grid;place-items:center;padding:16px}
+.login .card{width:100%;max-width:360px;padding:26px}
+.toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:var(--panel-2);border:1px solid var(--line);padding:10px 16px;border-radius:12px;font-weight:600;z-index:20;opacity:0;transition:opacity .2s;pointer-events:none;max-width:calc(100% - 32px)}
+.toast.show{opacity:1}
+.toast.bad{border-color:var(--bad);color:var(--bad)}
+dialog{background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:18px;padding:22px;width:min(560px,calc(100% - 24px));max-height:calc(100vh - 40px)}
+dialog::backdrop{background:rgba(0,0,0,.6)}
+.dlg-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:14px}
+.preview{border-radius:14px;padding:16px;background:#202329;border:1px solid var(--line);margin-top:4px}
+.preview .t{font-weight:700;font-size:17px;margin-bottom:6px}
+.preview .b{color:#c8ccd4;white-space:pre-wrap;font-size:14px}
+.progress{height:6px;background:var(--panel-2);border-radius:9px;overflow:hidden;margin-top:10px;display:none}
+.progress div{height:100%;width:0;background:var(--accent);transition:width .15s}
+@media (max-width:600px){.item{flex-direction:column}.item .actions{justify-content:flex-start}}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div class="toast" id="toast"></div>
+
+<dialog id="dlg"><form method="dialog" id="dlgForm"></form></dialog>
+
+<script>
+const $ = (s, el = document) => el.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const ago = t => { if (!t) return "never"; const s = Date.now()/1000 - t; if (s < 60) return "just now"; if (s < 3600) return Math.floor(s/60)+"m ago"; if (s < 86400) return Math.floor(s/3600)+"h ago"; return Math.floor(s/86400)+"d ago"; };
+const when = t => t ? new Date(t*1000).toLocaleString([], {dateStyle:"medium", timeStyle:"short"}) : "";
+const mb = b => b ? (b/1048576).toFixed(1)+" MB" : "";
+const toLocalInput = t => { if (!t) return ""; const d = new Date(t*1000); d.setMinutes(d.getMinutes()-d.getTimezoneOffset()); return d.toISOString().slice(0,16); };
+const fromLocalInput = v => v ? Math.floor(new Date(v).getTime()/1000) : null;
+
+function toast(msg, bad) { const t = $("#toast"); t.textContent = msg; t.className = "toast show" + (bad ? " bad" : ""); clearTimeout(t._h); t._h = setTimeout(() => t.className = "toast", 2600); }
+
+async function api(path, opts = {}) {
+  const o = { credentials: "same-origin", ...opts, headers: { ...(opts.headers||{}) } };
+  if (o.json !== undefined) { o.body = JSON.stringify(o.json); o.headers["Content-Type"] = "application/json"; delete o.json; }
+  const r = await fetch(path, o);
+  const data = await r.json().catch(() => ({}));
+  if (r.status === 401 && !path.endsWith("/login")) { state.admin = false; render(); throw new Error("Signed out"); }
+  if (!r.ok) throw new Error(data.error || data.detail || ("Error " + r.status));
+  return data;
+}
+
+const state = { admin: false, tab: "overview" };
+const TABS = [["overview","Overview"],["builds","Builds"],["messages","Messages"],["devices","Devices"],["settings","Settings"]];
+
+async function boot() {
+  try { state.admin = (await api("/api/admin/me")).admin; } catch {}
+  const h = location.hash.slice(1); if (TABS.some(t => t[0] === h)) state.tab = h;
+  render();
+}
+window.addEventListener("hashchange", () => { const h = location.hash.slice(1); if (TABS.some(t=>t[0]===h)) { state.tab = h; render(); } });
+
+function render() {
+  const app = $("#app");
+  if (!state.admin) {
+    app.innerHTML = `<div class="login"><div class="card">
+      <div class="logo" style="margin-bottom:18px"><i>▶</i>Plezy Panel</div>
+      <form id="loginForm"><label>Password<input type="password" name="password" autocomplete="current-password" required autofocus></label>
+      <button class="btn primary" style="width:100%;margin-top:14px">Sign in</button></form></div></div>`;
+    $("#loginForm").onsubmit = async e => { e.preventDefault();
+      try { await api("/api/admin/login", { method:"POST", json:{ password: e.target.password.value } }); state.admin = true; render(); }
+      catch (err) { toast(err.message, true); } };
+    return;
+  }
+  app.innerHTML = `<header><div class="bar"><div class="logo"><i>▶</i>Plezy Panel</div><div class="spacer"></div>
+      <button class="btn sm" id="logout">Sign out</button></div>
+      <nav>${TABS.map(([k,l]) => `<button data-tab="${k}" class="${state.tab===k?"on":""}">${l}</button>`).join("")}</nav></header>
+    <main class="wrap" id="view"><p class="muted" style="margin-top:30px">Loading…</p></main>`;
+  app.querySelectorAll("nav button").forEach(b => b.onclick = () => { location.hash = b.dataset.tab; });
+  $("#logout").onclick = async () => { await api("/api/admin/logout", {method:"POST"}); state.admin = false; render(); };
+  ({ overview, builds, messages, devices, settings })[state.tab]().catch(e => { if (e.message !== "Signed out") toast(e.message, true); });
+}
+
+/* ------------------------------------------------------------ overview */
+async function overview() {
+  const o = await api("/api/admin/overview");
+  const max = Math.max(1, ...o.versions.map(v => v.count));
+  $("#view").innerHTML = `
+    <h2>Overview</h2>
+    <div class="grid">
+      <div class="card stat"><b>${o.devices_24h}</b><span>devices today</span></div>
+      <div class="card stat"><b>${o.devices_7d}</b><span>this week</span></div>
+      <div class="card stat"><b>${o.latest ? esc(o.latest.version_name) : "—"}</b><span>live version</span></div>
+      <div class="card stat"><b>${o.live_messages}</b><span>live messages</span></div>
+    </div>
+    ${o.drafts ? `<div class="card" style="margin-top:12px;display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap">
+      <div><b>${o.drafts} build${o.drafts>1?"s":""} waiting.</b> <span class="muted">Publish to send the update pop-up.</span></div>
+      <a class="btn primary" href="#builds" style="text-decoration:none">Review</a></div>` : ""}
+    <h2>Versions in use <span class="muted small" style="font-weight:600">last 30 days</span></h2>
+    <div class="card">${o.versions.length ? `<div class="bars">${o.versions.map(v => `
+      <div><span class="mono">${esc(v.version_name||"?")} <span class="muted">(${v.version_code})</span></span>
+      <div class="track"><div class="fill" style="width:${(v.count/max*100).toFixed(0)}%"></div></div><b>${v.count}</b></div>`).join("")}</div>`
+      : `<div class="muted">No devices have checked in yet.</div>`}</div>
+    <h2>App check address</h2>
+    <div class="card"><div class="mono" style="word-break:break-all">${esc(o.check_url)}</div>
+    <div class="muted small" style="margin-top:6px">Builds made by your GitHub Action already point here.</div></div>`;
+}
+
+/* ------------------------------------------------------------ builds */
+async function builds() {
+  const rows = await api("/api/admin/releases");
+  $("#view").innerHTML = `
+    <h2>Builds <span class="spacer"></span><button class="btn primary sm" id="addBuild">Add build</button></h2>
+    <div class="list">${rows.length ? rows.map(r => `
+      <div class="item">
+        <div class="body">
+          <div class="title">${esc(r.version_name)} <span class="mono muted">#${r.version_code}</span>
+            <span class="pill ${r.status}">${r.status}</span><span class="pill">${esc(r.abi)}</span>
+            ${r.mandatory ? `<span class="pill critical">must update</span>` : ""}</div>
+          <div class="muted small">${[mb(r.size), r.source === "ci" ? "from GitHub" : r.source, when(r.published_at || r.created_at), r.downloads ? r.downloads+" downloads" : ""].filter(Boolean).join(" · ")}</div>
+          ${r.error ? `<div class="small" style="color:var(--bad);margin-top:4px">${esc(r.error)}</div>` : ""}
+          ${r.notes ? `<div class="notes">${esc(r.notes)}</div>` : ""}
+        </div>
+        <div class="actions">
+          ${r.status === "draft" ? `<button class="btn primary sm" data-act="publish" data-id="${r.id}">Publish</button>` : ""}
+          ${r.status === "published" ? `<button class="btn sm" data-act="unpublish" data-id="${r.id}">Unpublish</button>` : ""}
+          ${r.file_name ? `<a class="btn sm" style="text-decoration:none" href="/api/v1/download/${r.id}.apk">APK</a>` : ""}
+          ${r.status !== "importing" ? `<button class="btn sm" data-act="edit" data-id="${r.id}">Edit</button>` : ""}
+          <button class="btn sm danger" data-act="delete" data-id="${r.id}">Delete</button>
+        </div>
+      </div>`).join("") : `<div class="empty">No builds yet. Your GitHub Action adds them automatically, or tap <b>Add build</b> to upload an APK.</div>`}
+    </div>`;
+  if (rows.some(r => r.status === "importing")) setTimeout(() => state.tab === "builds" && builds().catch(()=>{}), 3000);
+  $("#addBuild").onclick = () => addBuildDialog();
+  $("#view").querySelectorAll("[data-act]").forEach(b => b.onclick = async () => {
+    const r = rows.find(x => x.id === b.dataset.id), act = b.dataset.act;
+    try {
+      if (act === "publish") { await api(`/api/admin/releases/${r.id}`, {method:"PATCH", json:{status:"published"}}); toast(`${r.version_name} is live`); }
+      if (act === "unpublish") { await api(`/api/admin/releases/${r.id}`, {method:"PATCH", json:{status:"draft"}}); toast("Unpublished"); }
+      if (act === "delete") { if (!confirm(`Delete ${r.version_name} (${r.abi})? The APK file is removed too.`)) return; await api(`/api/admin/releases/${r.id}`, {method:"DELETE"}); toast("Deleted"); }
+      if (act === "edit") return editBuildDialog(r);
+      builds();
+    } catch (e) { toast(e.message, true); }
+  });
+}
+
+function openDialog(html, onSubmit) {
+  const dlg = $("#dlg"), form = $("#dlgForm");
+  form.innerHTML = html;
+  form.onsubmit = async e => {
+    if (e.submitter && e.submitter.value === "cancel") return;
+    e.preventDefault();
+    const btn = e.submitter; if (btn) btn.disabled = true;
+    try { if (await onSubmit(new FormData(form), form) !== false) dlg.close(); }
+    catch (err) { toast(err.message, true); }
+    finally { if (btn) btn.disabled = false; }
+  };
+  dlg.showModal();
+}
+
+const abiSelect = v => `<select name="abi">${["armeabi-v7a","arm64-v8a","universal","x86_64"].map(a => `<option value="${a}" ${a===v?"selected":""}>${a}${a==="armeabi-v7a"?" (Firestick)":""}</option>`).join("")}</select>`;
+
+function addBuildDialog() {
+  openDialog(`
+    <h3>Add a build</h3><p class="muted small" style="margin-top:0">Upload an APK, or give a link (such as a GitHub release file) and the panel fetches it.</p>
+    <div class="row"><label>Version name<input name="version_name" placeholder="2.24.0" required></label>
+      <label>Version code<input name="version_code" type="number" min="1" placeholder="159001" required></label></div>
+    <div class="row"><label>Device type${abiSelect("armeabi-v7a")}</label></div>
+    <label>APK file<input type="file" name="file" accept=".apk"></label>
+    <p class="muted small" style="text-align:center;margin:8px 0">or</p>
+    <label>Link to APK<input name="url" type="url" placeholder="https://…/plezy.apk"></label>
+    <label style="margin-top:12px">What's new<textarea name="notes" placeholder="Shown in the update pop-up"></textarea></label>
+    <div style="display:flex;gap:16px;margin-top:10px;flex-wrap:wrap"><label class="check"><input type="checkbox" name="mandatory"> Must update</label>
+      <label class="check"><input type="checkbox" name="publish" checked> Publish straight away</label></div>
+    <div class="progress" id="up"><div></div></div>
+    <div class="dlg-actions"><button class="btn" value="cancel" formnovalidate>Cancel</button><button class="btn primary" value="ok">Add</button></div>`,
+  async (fd, form) => {
+    const file = fd.get("file"), url = fd.get("url").trim();
+    if ((!file || !file.size) && !url) throw new Error("Choose an APK or give a link");
+    if (file && file.size) {
+      fd.set("mandatory", fd.get("mandatory") ? "true" : "false"); fd.set("publish", fd.get("publish") ? "true" : "false"); fd.delete("url");
+      await new Promise((ok, fail) => {
+        const x = new XMLHttpRequest(); x.open("POST", "/api/admin/releases/upload");
+        const bar = $("#up", form); bar.style.display = "block";
+        x.upload.onprogress = e => bar.firstElementChild.style.width = (e.loaded/e.total*100) + "%";
+        x.onload = () => x.status < 300 ? ok() : fail(new Error((JSON.parse(x.responseText||"{}").error) || "Upload failed"));
+        x.onerror = () => fail(new Error("Upload failed. If the panel is behind Cloudflare, files over 100 MB need the link option."));
+        x.send(fd);
+      });
+      toast("Build added");
+    } else {
+      const res = await api("/api/admin/releases/import", {method:"POST", json:{
+        url, version_name: fd.get("version_name"), version_code: +fd.get("version_code"), abi: fd.get("abi"),
+        notes: fd.get("notes"), mandatory: !!fd.get("mandatory") }});
+      if (fd.get("publish")) waitThenPublish(res.id);
+      toast("Fetching the APK…");
+    }
+    builds();
+  });
+}
+
+async function waitThenPublish(id) {
+  for (let i = 0; i < 120; i++) {
+    await new Promise(r => setTimeout(r, 3000));
+    const r = (await api("/api/admin/releases")).find(x => x.id === id);
+    if (!r || r.status === "failed") return;
+    if (r.status === "draft") { await api(`/api/admin/releases/${id}`, {method:"PATCH", json:{status:"published"}}); toast(`${r.version_name} is live`); if (state.tab==="builds") builds(); return; }
+  }
+}
+
+function editBuildDialog(r) {
+  openDialog(`
+    <h3>Edit ${esc(r.version_name)} <span class="muted mono">${esc(r.abi)}</span></h3>
+    <label>Version name<input name="version_name" value="${esc(r.version_name)}"></label>
+    <label style="margin-top:12px">What's new<textarea name="notes" rows="8">${esc(r.notes)}</textarea></label>
+    <label class="check" style="margin-top:10px"><input type="checkbox" name="mandatory" ${r.mandatory?"checked":""}> Must update (no "Later" button)</label>
+    <div class="dlg-actions"><button class="btn" value="cancel" formnovalidate>Cancel</button><button class="btn primary" value="ok">Save</button></div>`,
+  async fd => {
+    await api(`/api/admin/releases/${r.id}`, {method:"PATCH", json:{ version_name: fd.get("version_name"), notes: fd.get("notes"), mandatory: !!fd.get("mandatory") }});
+    toast("Saved"); builds();
+  });
+}
+
+/* ------------------------------------------------------------ messages */
+async function messages() {
+  const rows = await api("/api/admin/messages");
+  const t = Date.now()/1000;
+  const status = m => !m.active ? ["off",""] : (m.starts_at && m.starts_at > t) ? ["scheduled","info"] : (m.ends_at && m.ends_at <= t) ? ["ended",""] : ["live","ok"];
+  $("#view").innerHTML = `
+    <h2>System messages <span class="spacer"></span><button class="btn primary sm" id="addMsg">New message</button></h2>
+    <p class="muted small" style="margin-top:-6px">Shown as a pop-up when Plezy opens.</p>
+    <div class="list">${rows.length ? rows.map(m => { const [s, c] = status(m); return `
+      <div class="item"><div class="body">
+        <div class="title">${esc(m.title)} <span class="pill ${m.level}">${m.level}</span><span class="pill ${c}">${s}</span>
+          <span class="pill">${m.repeat === "once" ? "show once" : "every launch"}</span></div>
+        ${m.body ? `<div class="notes">${esc(m.body)}</div>` : ""}
+        <div class="muted small" style="margin-top:6px">${[m.starts_at ? "from "+when(m.starts_at) : "", m.ends_at ? "until "+when(m.ends_at) : "",
+          m.min_version_code ? "builds ≥ "+m.min_version_code : "", m.max_version_code ? "builds ≤ "+m.max_version_code : ""].filter(Boolean).join(" · ") || "Everyone, no end date"}</div>
+      </div><div class="actions">
+        <button class="btn sm" data-act="toggle" data-id="${m.id}">${m.active ? "Switch off" : "Switch on"}</button>
+        <button class="btn sm" data-act="edit" data-id="${m.id}">Edit</button>
+        <button class="btn sm danger" data-act="delete" data-id="${m.id}">Delete</button>
+      </div></div>`; }).join("") : `<div class="empty">No messages. Use one for things like "Server down for maintenance tonight" or "New films added".</div>`}</div>`;
+  $("#addMsg").onclick = () => messageDialog();
+  $("#view").querySelectorAll("[data-act]").forEach(b => b.onclick = async () => {
+    const m = rows.find(x => x.id === b.dataset.id);
+    try {
+      if (b.dataset.act === "toggle") { await api(`/api/admin/messages/${m.id}`, {method:"PATCH", json:{active: !m.active}}); }
+      if (b.dataset.act === "delete") { if (!confirm(`Delete "${m.title}"?`)) return; await api(`/api/admin/messages/${m.id}`, {method:"DELETE"}); }
+      if (b.dataset.act === "edit") return messageDialog(m);
+      messages();
+    } catch (e) { toast(e.message, true); }
+  });
+}
+
+function messageDialog(m = {}) {
+  const editing = !!m.id;
+  openDialog(`
+    <h3>${editing ? "Edit message" : "New message"}</h3>
+    <label>Title<input name="title" value="${esc(m.title)}" maxlength="120" required></label>
+    <label style="margin-top:12px">Message<textarea name="body" rows="5" maxlength="4000">${esc(m.body)}</textarea></label>
+    <div class="row" style="margin-top:12px">
+      <label>Style<select name="level">${["info","warning","critical"].map(l => `<option ${m.level===l?"selected":""}>${l}</option>`).join("")}</select></label>
+      <label>Show<select name="repeat"><option value="once" ${m.repeat!=="every_launch"?"selected":""}>Once per device</option><option value="every_launch" ${m.repeat==="every_launch"?"selected":""}>Every time the app opens</option></select></label></div>
+    <div class="row"><label>Start (optional)<input type="datetime-local" name="starts_at" value="${toLocalInput(m.starts_at)}"></label>
+      <label>End (optional)<input type="datetime-local" name="ends_at" value="${toLocalInput(m.ends_at)}"></label></div>
+    <details style="margin-bottom:10px"><summary class="muted small" style="cursor:pointer">Only for some builds</summary>
+      <div class="row" style="margin-top:10px"><label>From build code<input type="number" name="min_version_code" value="${m.min_version_code??""}"></label>
+      <label>Up to build code<input type="number" name="max_version_code" value="${m.max_version_code??""}"></label></div></details>
+    <label class="check"><input type="checkbox" name="active" ${m.active===0?"":"checked"}> Live</label>
+    ${editing && m.repeat === "once" ? `<p class="muted small">Saving shows it once more to everyone who already saw it.</p>` : ""}
+    <div class="muted small" style="margin-top:12px">Preview</div>
+    <div class="preview"><div class="t" id="pvT"></div><div class="b" id="pvB"></div></div>
+    <div class="dlg-actions"><button class="btn" value="cancel" formnovalidate>Cancel</button><button class="btn primary" value="ok">${editing ? "Save" : "Send"}</button></div>`,
+  async fd => {
+    const num = k => fd.get(k) ? +fd.get(k) : null;
+    const body = { title: fd.get("title"), body: fd.get("body"), level: fd.get("level"), repeat: fd.get("repeat"), active: !!fd.get("active"),
+      starts_at: fromLocalInput(fd.get("starts_at")), ends_at: fromLocalInput(fd.get("ends_at")), min_version_code: num("min_version_code"), max_version_code: num("max_version_code") };
+    if (editing) await api(`/api/admin/messages/${m.id}`, {method:"PUT", json: body}); else await api("/api/admin/messages", {method:"POST", json: body});
+    toast(editing ? "Saved" : "Message is out"); messages();
+  });
+  const f = $("#dlgForm"), pv = () => { $("#pvT").textContent = (f.level.value === "critical" ? "⚠ " : f.level.value === "warning" ? "! " : "") + (f.title.value || "Title"); $("#pvB").textContent = f.body.value; };
+  f.oninput = pv; pv();
+}
+
+/* ------------------------------------------------------------ devices */
+async function devices() {
+  const rows = await api("/api/admin/devices");
+  $("#view").innerHTML = `
+    <h2>Devices <span class="muted small" style="font-weight:600">${rows.length}</span></h2>
+    <p class="muted small" style="margin-top:-6px">Every copy of your build checks in when it opens. Name them so you know whose is whose.</p>
+    <div class="list">${rows.length ? rows.map(d => `
+      <div class="item"><div class="body">
+        <div class="title">${esc(d.nickname || d.model || "Unknown device")} ${d.last_seen > Date.now()/1000-86400 ? `<span class="pill ok">today</span>` : ""}</div>
+        <div class="muted small">${[d.nickname ? d.model : "", d.os, d.abi, d.version_name ? "Plezy "+d.version_name : ""].filter(Boolean).map(esc).join(" · ")}</div>
+        <div class="muted small">Last seen ${ago(d.last_seen)} · first ${when(d.first_seen)}${d.ip ? " · "+esc(d.ip) : ""}</div>
+      </div><div class="actions">
+        <button class="btn sm" data-act="name" data-id="${d.id}">Name</button>
+        <button class="btn sm danger" data-act="forget" data-id="${d.id}">Forget</button>
+      </div></div>`).join("") : `<div class="empty">No devices yet. They appear once someone opens your build.</div>`}</div>`;
+  $("#view").querySelectorAll("[data-act]").forEach(b => b.onclick = async () => {
+    const d = rows.find(x => x.id === b.dataset.id);
+    try {
+      if (b.dataset.act === "name") { const n = prompt("Name this device (e.g. Dave's lounge Firestick)", d.nickname || ""); if (n === null) return; await api(`/api/admin/devices/${d.id}`, {method:"PATCH", json:{nickname:n}}); }
+      if (b.dataset.act === "forget") { if (!confirm("Forget this device? It reappears if it checks in again.")) return; await api(`/api/admin/devices/${d.id}`, {method:"DELETE"}); }
+      devices();
+    } catch (e) { toast(e.message, true); }
+  });
+}
+
+/* ------------------------------------------------------------ settings */
+async function settings() {
+  const s = await api("/api/admin/settings");
+  $("#view").innerHTML = `
+    <h2>Settings</h2>
+    <form class="card" id="setForm">
+      <label class="check"><input type="checkbox" name="auto_publish" ${s.auto_publish?"checked":""}> Publish GitHub builds automatically</label>
+      <p class="muted small" style="margin:4px 0 16px 26px">Off: new builds wait in <b>Builds</b> until you publish them. On: friends get the pop-up as soon as a build lands.</p>
+      <div class="row">
+        <label>Oldest build allowed (code)<input type="number" min="0" name="min_version_code" value="${s.min_version_code}"></label>
+        <label>Re-check while open (hours)<input type="number" min="1" max="168" name="check_interval_hours" value="${s.check_interval_hours}"></label></div>
+      <p class="muted small" style="margin-top:-4px">Devices on a build older than the oldest allowed get an update pop-up with no "Later" button. 0 means off.</p>
+      <div style="display:flex;justify-content:flex-end"><button class="btn primary">Save</button></div>
+    </form>
+    <h2>GitHub link</h2>
+    <div class="card small">${s.ci_token_set ? `<span class="pill ok">ready</span> The panel accepts builds from your GitHub Action.`
+      : `<span class="pill failed">not set</span> Set <span class="mono">CI_TOKEN</span> in the panel's <span class="mono">.env</span> and the same value as the <span class="mono">PANEL_CI_TOKEN</span> secret on GitHub.`}</div>`;
+  $("#setForm").onsubmit = async e => { e.preventDefault(); const f = e.target;
+    try { await api("/api/admin/settings", {method:"PATCH", json:{ auto_publish: f.auto_publish.checked, min_version_code: +f.min_version_code.value||0, check_interval_hours: +f.check_interval_hours.value||6 }}); toast("Saved"); }
+    catch (err) { toast(err.message, true); } };
+}
+
+boot();
+</script>
+</body>
+</html>
