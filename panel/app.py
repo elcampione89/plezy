@@ -303,6 +303,116 @@ def get_latest(abi: str = "armeabi-v7a"):
     )
 
 
+# ---------------------------------------------------------------- Arvio mirror (fixed link for the app store)
+
+ARVIO_UPDATE_URL = os.environ.get("ARVIO_UPDATE_URL", "https://blacksheep.lol/varvio/arvio-panel/api/arvio/update.php")
+ARVIO_DIR = DATA_DIR / "arvio"
+ARVIO_DIR.mkdir(parents=True, exist_ok=True)
+_arvio_lock = threading.Lock()
+_arvio_state: dict[str, Any] = {"checked": 0.0, "assets": {}, "tag": None, "error": None}
+
+
+def _pick_arvio_asset(assets: list[dict], abi: str) -> dict | None:
+    """Same choice the Arvio app makes on a device of this type."""
+    apks = [a for a in assets if str(a.get("name", "")).lower().endswith(".apk")]
+    if not apks:
+        return None
+    if len(apks) == 1:
+        return apks[0]
+    wanted = ["armeabi-v7a", "arm32", "armv7"] if abi == "armeabi-v7a" else ["arm64-v8a", "arm64"]
+    for w in wanted:
+        for a in apks:
+            if w in a["name"].lower():
+                return a
+    for a in apks:
+        n = a["name"].lower()
+        if "universal" in n or "all" in n or "release" in n:
+            return a
+    known = ("arm64-v8a", "armeabi-v7a", "x86_64", "x86")
+    return next((a for a in apks if not any(k in a["name"].lower() for k in known)), apks[0])
+
+
+def _refresh_arvio(force: bool = False) -> None:
+    """Read the Arvio update feed and download any new APK (kept until the next version)."""
+    with _arvio_lock:
+        if not force and time.time() - _arvio_state["checked"] < 600:
+            return
+        _arvio_state["checked"] = time.time()
+        try:
+            r = httpx.get(ARVIO_UPDATE_URL, headers={"Accept": "application/json", "User-Agent": "plezy-panel"},
+                          timeout=20, follow_redirects=True)
+            r.raise_for_status()
+            data = r.json()
+            releases = data if isinstance(data, list) else [data]
+            rel = next((x for x in releases if x and not x.get("draft") and not x.get("prerelease")), None)
+            if not rel:
+                raise ValueError("Arvio feed has no release")
+            assets = rel.get("assets") or []
+            found: dict[str, Path] = {}
+            for abi in ("armeabi-v7a", "arm64-v8a"):
+                a = _pick_arvio_asset(assets, abi)
+                if not a:
+                    continue
+                url = a["browser_download_url"]
+                path = ARVIO_DIR / (hashlib.sha256(url.encode()).hexdigest()[:24] + ".apk")
+                if not path.exists():
+                    tmp = path.with_suffix(".part")
+                    with httpx.stream("GET", url, follow_redirects=True, timeout=120) as dl:
+                        dl.raise_for_status()
+                        with tmp.open("wb") as f:
+                            for chunk in dl.iter_bytes(1 << 20):
+                                f.write(chunk)
+                    if tmp.open("rb").read(4) != b"PK\x03\x04":
+                        tmp.unlink(missing_ok=True)
+                        raise ValueError(f"{a['name']} isn't an APK")
+                    tmp.rename(path)
+                found[abi] = path
+            if not found:
+                raise ValueError("Arvio release has no APK")
+            # Drop copies of older versions.
+            keep = set(found.values())
+            for old in ARVIO_DIR.glob("*.apk"):
+                if old not in keep:
+                    old.unlink(missing_ok=True)
+            _arvio_state.update(assets=found, tag=rel.get("tag_name") or rel.get("name"), error=None)
+        except Exception as e:  # noqa: BLE001 — keep serving the last good copy
+            _arvio_state["error"] = str(e)[:300]
+
+
+def _arvio_background() -> None:
+    while True:
+        _refresh_arvio(force=True)
+        time.sleep(600)
+
+
+threading.Thread(target=_arvio_background, daemon=True, name="arvio-mirror").start()
+
+
+@app.get("/arvio.apk")
+@app.get("/arvio-{abi}.apk")
+def arvio_latest(abi: str = "armeabi-v7a"):
+    """Fixed direct link to the newest Arvio APK."""
+    abi = "arm64-v8a" if abi in {"arm64", "64", "arm64-v8a"} else "armeabi-v7a"
+    _refresh_arvio()
+    path = _arvio_state["assets"].get(abi)
+    if not path or not Path(path).exists():
+        raise HTTPException(503, _arvio_state["error"] or "Arvio isn't ready yet, try again in a minute")
+    return FileResponse(path, media_type="application/vnd.android.package-archive", filename="arvio.apk",
+                        headers={"Cache-Control": "no-cache"})
+
+
+@app.get("/api/admin/arvio")
+def arvio_status(request: Request):
+    require_admin(request)
+    return {
+        "feed": ARVIO_UPDATE_URL,
+        "version": _arvio_state["tag"],
+        "error": _arvio_state["error"],
+        "checked": int(_arvio_state["checked"]),
+        "files": {k: Path(v).stat().st_size for k, v in _arvio_state["assets"].items() if Path(v).exists()},
+    }
+
+
 @app.get("/healthz")
 def healthz():
     return {"ok": True}
