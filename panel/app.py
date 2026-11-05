@@ -273,21 +273,34 @@ def download(release_id: str):
 
 @app.get("/get")
 @app.get("/get/{abi}")
+@app.get("/plezy.apk")
+@app.get("/plezy-{abi}.apk")
 def get_latest(abi: str = "armeabi-v7a"):
-    """Short link for Downloader on a Firestick: the newest published build."""
+    """Fixed direct link to the newest published build (for Downloader and app stores)."""
     if abi in {"arm64", "64"}:
         abi = "arm64-v8a"
     if abi not in ABIS:
         abi = "armeabi-v7a"
     with db() as c:
-        r = c.execute(
-            "SELECT id FROM releases WHERE status='published' AND abi IN (?, 'universal') AND file_name IS NOT NULL "
-            "ORDER BY version_code DESC LIMIT 1",
-            (abi,),
-        ).fetchone()
-    if not r:
-        raise HTTPException(404, "No published build yet")
-    return RedirectResponse(f"/api/v1/download/{r['id']}.apk", status_code=302)
+        r = row(
+            c.execute(
+                "SELECT * FROM releases WHERE status='published' AND abi IN (?, 'universal') AND file_name IS NOT NULL "
+                "ORDER BY version_code DESC LIMIT 1",
+                (abi,),
+            ).fetchone()
+        )
+        if not r:
+            raise HTTPException(404, "No published build yet")
+        c.execute("UPDATE releases SET downloads=downloads+1 WHERE id=?", (r["id"],))
+    path = APK_DIR / r["file_name"]
+    if not path.exists():
+        raise HTTPException(404, "File missing on server")
+    return FileResponse(
+        path,
+        media_type="application/vnd.android.package-archive",
+        filename="plezy.apk",
+        headers={"Cache-Control": "no-cache"},
+    )
 
 
 @app.get("/healthz")
