@@ -1,0 +1,45 @@
+# Sends an existing private build to the panel again (for example if the panel was offline).
+name: Private send to panel
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag, e.g. private-2.25.0-159001 (blank = newest private build)"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+env:
+  PANEL_URL: ${{ vars.PANEL_URL || 'https://plezy.daemonhub.tech' }}
+
+jobs:
+  send:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send APKs
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PANEL_CI_TOKEN: ${{ secrets.PANEL_CI_TOKEN }}
+          TAG: ${{ inputs.tag }}
+        run: |
+          repo=${{ github.repository }}
+          [ -n "$TAG" ] || TAG=$(gh api "repos/$repo/releases" -q '[.[] | select(.tag_name | startswith("private-"))][0].tag_name')
+          echo "Sending $TAG"
+          gh api "repos/$repo/releases/tags/$TAG" -q .body > notes.txt
+          name=$(echo "$TAG" | sed -E 's/^private-(.*)-[0-9]+$/\1/')
+          aapt2=$(ls -d "$ANDROID_HOME"/build-tools/*/ | sort -V | tail -1)aapt2
+          mkdir out
+          for abi in armeabi-v7a arm64-v8a; do
+            file=plezy-$name-$abi.apk
+            gh release download "$TAG" -R "$repo" -p "$file" -D out
+            code=$("$aapt2" dump badging "out/$file" | sed -n "s/.*versionCode='\([0-9]*\)'.*/\1/p" | head -1)
+            body=$(jq -n --arg url "https://github.com/$repo/releases/download/$TAG/$file" --arg vn "$name" --argjson vc "$code" \
+              --arg abi "$abi" --arg sha "$(sha256sum "out/$file" | cut -d' ' -f1)" --rawfile notes notes.txt \
+              '{url:$url, version_name:$vn, version_code:$vc, abi:$abi, sha256:$sha, notes:$notes}')
+            curl -fsS -X POST "${PANEL_URL%/}/api/ci/release" \
+              -H "Authorization: Bearer $PANEL_CI_TOKEN" -H "Content-Type: application/json" -d "$body"
+            echo
+          done
