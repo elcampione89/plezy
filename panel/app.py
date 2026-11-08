@@ -254,7 +254,7 @@ def check(
     }
 
 
-@app.get("/api/v1/download/{release_id}.apk")
+@app.api_route("/api/v1/download/{release_id}.apk", methods=["GET", "HEAD"])
 def download(release_id: str):
     with db() as c:
         r = row(c.execute("SELECT * FROM releases WHERE id=? AND status IN ('published','draft')", (release_id,)).fetchone())
@@ -271,10 +271,10 @@ def download(release_id: str):
     )
 
 
-@app.get("/get")
-@app.get("/get/{abi}")
-@app.get("/plezy.apk")
-@app.get("/plezy-{abi}.apk")
+@app.api_route("/get", methods=["GET", "HEAD"])
+@app.api_route("/get/{abi}", methods=["GET", "HEAD"])
+@app.api_route("/plezy.apk", methods=["GET", "HEAD"])
+@app.api_route("/plezy-{abi}.apk", methods=["GET", "HEAD"])
 def get_latest(abi: str = "armeabi-v7a"):
     """Fixed direct link to the newest published build (for Downloader and app stores)."""
     if abi in {"arm64", "64"}:
@@ -394,8 +394,8 @@ def _arvio_background() -> None:
 threading.Thread(target=_arvio_background, daemon=True, name="arvio-mirror").start()
 
 
-@app.get("/arvio.apk")
-@app.get("/arvio-{abi}.apk")
+@app.api_route("/arvio.apk", methods=["GET", "HEAD"])
+@app.api_route("/arvio-{abi}.apk", methods=["GET", "HEAD"])
 def arvio_latest(abi: str = "armeabi-v7a"):
     """Fixed direct link to the newest Arvio APK."""
     abi = "arm64-v8a" if abi in {"arm64", "64", "arm64-v8a"} else "armeabi-v7a"
