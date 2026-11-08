@@ -376,12 +376,18 @@ def _refresh_arvio(force: bool = False) -> None:
                     old.unlink(missing_ok=True)
             _arvio_state.update(assets=found, tag=rel.get("tag_name") or rel.get("name"), error=None)
         except Exception as e:  # noqa: BLE001 — keep serving the last good copy
-            _arvio_state["error"] = str(e)[:300]
+            _arvio_state["error"] = f"{type(e).__name__}: {e}"[:300]
+            print(f"[arvio] refresh failed: {_arvio_state['error']}", flush=True)
+        else:
+            print(f"[arvio] serving {_arvio_state['tag']}", flush=True)
 
 
 def _arvio_background() -> None:
     while True:
-        _refresh_arvio(force=True)
+        try:
+            _refresh_arvio(force=True)
+        except BaseException as e:  # never let the checker thread die
+            print(f"[arvio] checker error: {e!r}", flush=True)
         time.sleep(600)
 
 
@@ -398,7 +404,8 @@ def arvio_latest(abi: str = "armeabi-v7a"):
     if not path or not Path(path).exists():
         raise HTTPException(503, _arvio_state["error"] or "Arvio isn't ready yet, try again in a minute")
     return FileResponse(path, media_type="application/vnd.android.package-archive", filename="arvio.apk",
-                        headers={"Cache-Control": "no-cache"})
+                        headers={"Cache-Control": "no-cache", "X-Arvio-Version": str(_arvio_state["tag"] or ""),
+                                 "X-Arvio-Error": (_arvio_state["error"] or "").encode("ascii", "replace").decode()[:200]})
 
 
 @app.get("/api/admin/arvio")
